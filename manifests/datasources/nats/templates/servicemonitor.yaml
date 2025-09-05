@@ -1,0 +1,22 @@
+{{- if .Values.servicemonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nats
+spec:
+  endpoints:
+    - port: jmx
+      path: /metrics
+      interval: 30s
+      relabelings:
+        - action: replace
+          sourceLabels: [__address__]
+          targetLabel: service
+          replacement: 'nats'
+  namespaceSelector:
+    matchNames:
+    - datasources
+  selector:
+    matchLabels:
+      app: nats
+{{- end }}

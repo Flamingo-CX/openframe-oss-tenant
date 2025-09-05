@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>NATS WebSocket Client</title>
+</head>
+<body>
+<h1>NATS WebSocket</h1>
+
+<section>
+    <h2>Subscribe</h2>
+    <input id="subTopic" placeholder="Topic to subscribe" value="$SYS.ACCOUNT.*.*" />
+    <button onclick="subscribe()">Subscribe</button>
+</section>
+
+<section>
+    <h2>Publish</h2>
+    <input id="pubTopic" placeholder="Topic to publish" />
+    <input id="pubMsg" placeholder="Message to publish" />
+    <button onclick="publish()">Publish</button>
+</section>
+
+<ul id="log"></ul>
+
+<script type="module">
+    import { connect, StringCodec } from 'https://cdn.skypack.dev/nats.ws';
+
+    let nc;
+    const sc = StringCodec();
+
+    // Format JSON beautifully
+    function formatMessage(message) {
+        try {
+            // Try to parse as JSON
+            const jsonObj = JSON.parse(message);
+            // If successful, format with indentation
+            return JSON.stringify(jsonObj, null, 2);
+        } catch (error) {
+            // If not JSON, return as is
+            return message;
+        }
+    }
+
+    // Connect to NATS WebSocket
+    async function connectToNats() {
+        try {
+            nc = await connect({
+                servers: "ws://localhost:8100/ws/nats",
+                user: "service",
+                pass: "service_pass"
+            });
+            console.log("Connected to NATS!");
+            addToLog("Connected to NATS server");
+        } catch (error) {
+            console.error("Error connecting to NATS:", error);
+        }
+    }
+
+    // Subscribe to a topic entered by the user
+    window.subscribe = async function () {
+        const topic = document.getElementById('subTopic').value.trim();
+        if (!topic || !nc || nc.isClosed()) {
+            return;
+        }
+        addToLog(`Subscribing to "${topic}" ...`);
+        const sub = nc.subscribe(topic);
+        (async () => {
+            for await (const msg of sub) {
+                const message = sc.decode(msg.data);
+                const formattedMessage = formatMessage(message);
+                addToLog(`[${topic}] Received:\n${formattedMessage}`);
+            }
+        })();
+        document.getElementById('subTopic').value = '';
+    };
+
+    // Publish a message to the specified topic
+    window.publish = async function () {
+        const topic = document.getElementById('pubTopic').value.trim();
+        const message = document.getElementById('pubMsg').value;
+        if (!topic || !message || !nc || nc.isClosed()) {
+            return;
+        }
+        try {
+            nc.publish(topic, sc.encode(message));
+            addToLog(`[${topic}] Sent: ${message}`);
+            document.getElementById('pubMsg').value = '';
+        } catch (error) {
+            console.error("Error publishing message:", error);
+        }
+    };
+
+    function addToLog(message) {
+        const log = document.getElementById('log');
+        const li = document.createElement('li');
+        // Use <pre> element to preserve formatting and whitespace
+        const pre = document.createElement('pre');
+        pre.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+        li.appendChild(pre);
+        log.appendChild(li);
+    }
+
+    // Connect when page loads
+    connectToNats();
+</script>
+</body>
+</html>

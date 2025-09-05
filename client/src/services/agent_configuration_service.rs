@@ -8,8 +8,7 @@ use crate::platform::directories::DirectoryManager;
 
 #[derive(Clone)]
 pub struct AgentConfigurationService {
-    config_file_path: PathBuf,
-    directory_manager: DirectoryManager,
+    config_file_path: PathBuf
 }
 
 impl AgentConfigurationService {
@@ -20,8 +19,7 @@ impl AgentConfigurationService {
             .with_context(|| "Failed to ensure secured directory exists")?;
 
         Ok(Self { 
-            config_file_path,
-            directory_manager,
+            config_file_path
         })
     }
 

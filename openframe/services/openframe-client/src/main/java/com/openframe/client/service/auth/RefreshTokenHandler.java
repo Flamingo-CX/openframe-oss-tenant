@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+import static com.openframe.client.service.AgentAuthService.REFRESH_TOKEN_GRANT_TYPE;
 import static org.springframework.security.oauth2.core.OAuth2TokenIntrospectionClaimNames.TOKEN_TYPE;
 
 @Component
@@ -38,7 +39,7 @@ public class RefreshTokenHandler {
                     return new IllegalArgumentException("Client not found");
                 });
 
-        String accessToken = accessTokenGenerator.generate(client, "refresh_token");
+        String accessToken = accessTokenGenerator.generate(client, REFRESH_TOKEN_GRANT_TYPE);
         String newRefreshToken = refreshTokenGenerator.generateNext(clientId, refreshCount);
         long accessTokenExpirationSeconds = accessTokenGenerator.getExpirationSeconds();
 

@@ -395,11 +395,11 @@ impl CrossPlatformServiceManager {
                             ctx.contents = Some(plist_xml);
                         }
                         Err(e) => {
-                            warn!("Failed to convert plist XML to string: {}", e);
+                            warn!("Failed to convert plist XML to string: {:#}", e);
                         }
                     },
                     Err(e) => {
-                        warn!("Failed to serialize macOS service options to plist: {}", e);
+                        warn!("Failed to serialize macOS service options to plist: {:#}", e);
                     }
                 }
             }
@@ -454,7 +454,7 @@ impl CrossPlatformServiceManager {
                         ctx.contents = Some(json_string);
                     }
                     Err(e) => {
-                        warn!("Failed to serialize Linux service options: {}", e);
+                        warn!("Failed to serialize Linux service options: {:#}", e);
                     }
                 }
             }

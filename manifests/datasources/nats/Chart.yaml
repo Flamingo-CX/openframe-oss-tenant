@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nats
+description: A NATS helm chart.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

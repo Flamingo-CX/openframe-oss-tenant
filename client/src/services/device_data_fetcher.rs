@@ -17,7 +17,7 @@ impl DeviceDataFetcher {
                 Some(hostname_str)
             }
             Err(e) => {
-                warn!("Failed to get hostname: {}", e);
+                warn!("Failed to get hostname: {:#}", e);
                 None
             }
         }

@@ -1,0 +1,12 @@
+registerJob:
+  enabled: true
+servicemonitor:
+  enabled: true
+
+credentials:
+  admin_user: "admin"            
+  admin_pass: "secretpassword"  
+  device_user: "deviceuser"     
+  device_pass: "devicepassword"
+  service_user: "service"
+

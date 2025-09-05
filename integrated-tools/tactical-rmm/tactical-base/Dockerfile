@@ -20,7 +20,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git gcc libc6-dev redis-tools
 
 # Clone the repository and install dependencies
-RUN git clone https://github.com/flamingo-stack/tacticalrmm.git .
+RUN git clone -b fix/connection-close https://github.com/Flamingo-CX/tacticalrmm.git .
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir setuptools wheel daphne django_extensions django-silk && \

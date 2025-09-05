@@ -78,7 +78,12 @@
             <version>${pinot.version}</version>
         </dependency>
 
-
+        <!-- Nats -->
+        <dependency>
+            <groupId>io.nats</groupId>
+            <artifactId>nats-spring-cloud-stream-binder</artifactId>
+            <version>${nats.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

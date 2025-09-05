@@ -112,4 +112,41 @@ spec:
               --retry-delay 2 \
               --retry-all-errors
             echo "TacticalRMM Registration complete."
+            
+            echo "Registering Tactical RMM Agent..."
+            curl --verbose --show-error --fail \
+              -X POST "http://openframe-management.microservices.svc.cluster.local:8095/v1/tool-agents/tactical-rmm" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "toolAgent": {
+                  "id": "tacticalrmm-agent",
+                  "toolId": "tactical-rmm"
+                  "version": "1.0",
+                  "status": "ENABLED",
+                  "installationCommandArgs": [
+                    "-m", "install",
+                    "-api", "${client.serverUrl}",
+                    "-auth", "${server.registrationSecret}",
+                    "-client-id", "1",
+                    "-site-id", "1",
+                    "-agent-type", "workstation",
+                    "-log", "DEBUG",
+                    "-logto", "stdout",
+                    "--openframe-mode",
+                    "-nomesh",
+                    "--openframe-secret", "${client.openframeSecret}",
+                    "--openframe-token-path", "${client.openframeTokenPath}"
+                  ],
+                  "runCommandArgs": [
+                    "-m", "svc",
+                    "-log", "DEBUG",
+                    "-logto", "stdout",
+                    "-openframe-secret", "${client.openframeSecret}",
+                    "--openframe-token-path", "${client.openframeTokenPath}"
+                  ]
+                }
+              }' \
+              --retry-delay 2 \
+              --retry-all-errors
+            echo "TacticalRMM Agent Registration complete."
 {{- end }}

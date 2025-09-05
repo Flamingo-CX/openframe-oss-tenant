@@ -124,4 +124,39 @@ spec:
               --retry-delay 2 \
               --retry-all-errors
             echo "MeshCentral Server Registration complete."
+
+            echo "Registering MeshCentral Agent..."
+            curl --verbose --show-error --fail \
+              -X POST "http://openframe-management.microservices.svc.cluster.local:8095/v1/tool-agents/meshcentral-server" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "toolAgent": {
+                  "id": "meshcentral-agent",
+                  "toolId": "meshcentral-server",
+                  "version": "1.0",
+                  "status": "ENABLED",
+                  "runCommandArgs": [
+                    "connect",
+                    "--openframe-mode",
+                    "--openframe-secret", "${client.openframeSecret}",
+                    "--openframe-token-path", "${client.openframeTokenPath}"
+                  ],
+                  "assets": [
+                    {
+                      "id": "meshcentral-core-module",
+                      "localFilename": "CoreModule.js"
+                      "source": "ARTIFACTORY"
+                    },
+                    {
+                      "id": "msh-configuration",
+                      "localFilename": "agent.msh"
+                      "source": "TOOL_API",
+                      "path": "/openframe_public/meshagent.msh"
+                    }
+                  ]
+                }
+              }' \
+              --retry-delay 2 \
+              --retry-all-errors
+            echo "MeshCentral Agent Registration complete."
 {{- end }}

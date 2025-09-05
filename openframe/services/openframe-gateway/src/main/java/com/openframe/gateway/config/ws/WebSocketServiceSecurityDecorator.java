@@ -17,13 +17,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 
-import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.TOOLS_AGENT_WS_ENDPOINT_PREFIX;
-import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.TOOLS_API_WS_ENDPOINT_PREFIX;
-import static com.openframe.gateway.security.SecurityConstants.AUTHORIZATION_QUERY_PARAM;
+import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.*;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 @RequiredArgsConstructor
 @Slf4j
+// TODO: remove session wrapper after testing
 public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     private final WebSocketService defaultWebSocketService;
@@ -32,7 +31,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     @Override
     public Mono<Void> handleRequest(ServerWebExchange exchange, WebSocketHandler defaultWebSocketHandler) {
         String path = exchange.getRequest().getPath().value();
-        
+
         if (isSecuredEndpoint(path)) {
             return defaultWebSocketService.handleRequest(exchange, session -> {
                 Jwt jwt = getRequestJwt(exchange);
@@ -40,16 +39,25 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
                 Disposable disposable = scheduleSessionRemoveJob(session, secondsUntilExpiration);
                 processSessionClosedEvent(session, disposable);
-                return defaultWebSocketHandler.handle(session);
+                return defaultWebSocketHandler.handle(new TemporaryWsSessionWrapper(session));
             });
         } else {
             return defaultWebSocketService.handleRequest(exchange, defaultWebSocketHandler);
         }
     }
 
+    /* TODO: avoid hardcoded paths.
+        Relay on spring security to verify that endpoint is available with token or no token.
+        Then if request have token, we should run session remove job etc.
+    */
     private boolean isSecuredEndpoint(String path) {
-        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX).stream()
+        return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH)
+                .stream()
                 .anyMatch(path::startsWith);
+    }
+
+    private boolean isNatsEndpoint(String path) {
+        return path.equals(NATS_WS_ENDPOINT_PATH);
     }
 
     private Jwt getRequestJwt(ServerWebExchange exchange) {
@@ -70,10 +78,6 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         String authorisationHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (isNotEmpty(authorisationHeader)) {
             return authorisationHeader;
-        }
-        String authorisationParam = request.getQueryParams().getFirst(AUTHORIZATION_QUERY_PARAM);
-        if (isNotEmpty(authorisationParam)) {
-            return authorisationParam;
         }
         throw new IllegalStateException("No authorization data found");
     }

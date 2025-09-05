@@ -97,6 +97,16 @@ generate_msh_file() {
   local mesh_id=$(cat "${MESH_DIR}/mesh_id")
   local server_id=$(cat "${MESH_DIR}/mesh_server_id")
 
+  # Determine the server URL based on openframe-mode
+  local mesh_server_url
+  if [ "${OPENFRAME_MODE}" = "true" ]; then
+    echo "[meshcentral] OpenFrame mode enabled - using OpenFrame gateway URL"
+    mesh_server_url="wss://localhost/ws/tools/agent/meshcentral-server/agent.ashx"
+  else
+    echo "[meshcentral] Standard mode - using direct MeshCentral URL"
+    mesh_server_url="${MESH_PROTOCOL}://${MESH_NGINX_NAT_HOST}:${MESH_EXTERNAL_PORT}/agent.ashx"
+  fi
+
   # Create the MSH file content with environment variable substitution
   cat >"${MESH_DIR}/meshagent.msh" <<EOL
 MeshName=${MESH_DEVICE_GROUP}
@@ -104,7 +114,7 @@ MeshType=2
 MeshID=${mesh_id}
 ignoreProxyFile=1
 ServerID=${server_id}
-MeshServer=${MESH_PROTOCOL}://${MESH_NGINX_NAT_HOST}:${MESH_EXTERNAL_PORT}/agent.ashx
+MeshServer=${mesh_server_url}
 EOL
 
   chown node:node "${MESH_DIR}/meshagent.msh"
@@ -112,6 +122,8 @@ EOL
 
   mkdir -p "${MESH_DIR}/nginx-api/openframe_public"
   cp "${MESH_DIR}/meshagent.msh" "${MESH_DIR}/nginx-api/openframe_public/meshagent.msh"
+  
+  echo "[meshcentral] MSH file generated with server URL: ${mesh_server_url}"
 } 
 
 generate_mesh_auth_args() {

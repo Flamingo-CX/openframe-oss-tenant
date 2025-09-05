@@ -14,6 +14,9 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AgentAuthService {
 
+    public static final String CLIENT_CREDENTIALS_GRANT_TYPE = "client_credentials";
+    public static final String REFRESH_TOKEN_GRANT_TYPE = "refresh_token";
+
     private final ClientCredentialsHandler clientCredentialsHandler;
     private final RefreshTokenHandler refreshTokenHandler;
 
@@ -26,8 +29,8 @@ public class AgentAuthService {
         log.debug("Validating client - ID: {}", clientId);
 
         return switch (grantType) {
-            case "client_credentials" -> clientCredentialsHandler.handle(clientId, clientSecret);
-            case "refresh_token" -> refreshTokenHandler.handle(refreshToken);
+            case CLIENT_CREDENTIALS_GRANT_TYPE -> clientCredentialsHandler.handle(clientId, clientSecret);
+            case REFRESH_TOKEN_GRANT_TYPE -> refreshTokenHandler.handle(refreshToken);
             default -> throw new IllegalArgumentException("Unsupported grant type: " + grantType);
         };
     }

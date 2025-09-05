@@ -2,9 +2,9 @@ package com.openframe.client.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.exception.*;
+import com.openframe.client.service.agentregistration.AgentRegistrationService;
 import com.openframe.client.util.TestAuthenticationManager;
 import com.openframe.client.dto.agent.*;
-import com.openframe.client.service.AgentService;
 import com.openframe.client.service.ToolConnectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class AgentControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private AgentService agentService;
+    private AgentRegistrationService agentRegistrationService;
 
     @Mock
     private ToolConnectionService toolConnectionService;
@@ -56,7 +56,7 @@ class AgentControllerTest {
 
     @BeforeEach
     void setup() {
-        AgentController controller = new AgentController(agentService, toolConnectionService);
+        AgentController controller = new AgentController(agentRegistrationService, toolConnectionService);
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
@@ -93,8 +93,8 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithValidRequest_ReturnsOk() throws Exception {
-        when(agentService.registerAgent(any(), any())).thenReturn(registrationResponse);
+    void register_WithValidRequest_ReturnsOk() throws Exception {
+        when(agentRegistrationService.register(any(), any())).thenReturn(registrationResponse);
 
         mockMvc.perform(post("/api/agents/register")
                         .header("X-Initial-Key", "test-key")
@@ -132,51 +132,6 @@ class AgentControllerTest {
 
     @Test
     @WithMockUser(roles = "USER")
-    void userCanAddToolConnection() throws Exception {
-        when(toolConnectionService.addToolConnection(
-                eq(OPENFRAME_AGENT_ID),
-                eq(TOOL_TYPE),
-                eq(AGENT_TOOL_ID)))
-                .thenReturn(toolConnectionResponse);
-
-        mockMvc.perform(post("/api/agents/tool-connection")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(toolConnectionRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.openframeAgentId").value(OPENFRAME_AGENT_ID))
-                .andExpect(jsonPath("$.toolType").value(TOOL_TYPE))
-                .andExpect(jsonPath("$.agentToolId").value(AGENT_TOOL_ID));
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void userCanUpdateToolConnection() throws Exception {
-        when(toolConnectionService.updateToolConnection(
-                eq(OPENFRAME_AGENT_ID),
-                eq(TOOL_TYPE),
-                eq(AGENT_TOOL_ID)))
-                .thenReturn(toolConnectionResponse);
-
-        mockMvc.perform(put("/api/agents/tool-connections/{openframeAgentId}/{toolType}",
-                        OPENFRAME_AGENT_ID, TOOL_TYPE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(toolConnectionUpdateRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.openframeAgentId").value(OPENFRAME_AGENT_ID))
-                .andExpect(jsonPath("$.toolType").value(TOOL_TYPE))
-                .andExpect(jsonPath("$.agentToolId").value(AGENT_TOOL_ID));
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void userCanDeleteToolConnection() throws Exception {
-        mockMvc.perform(delete("/api/agents/tool-connections/{openframeAgentId}/{toolType}",
-                        OPENFRAME_AGENT_ID, TOOL_TYPE))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
     void getToolConnectionsByMachineId_WithUserRole_ReturnsOk() throws Exception {
         when(toolConnectionService.getToolConnectionsByMachineId(OPENFRAME_AGENT_ID))
                 .thenReturn(Arrays.asList(toolConnectionResponse));
@@ -201,18 +156,7 @@ class AgentControllerTest {
     }
 
     @Test
-    @WithMockUser
-    void addToolConnection_WithInvalidRequest_ReturnsBadRequest() throws Exception {
-        ToolConnectionRequest invalidRequest = new ToolConnectionRequest();
-
-        mockMvc.perform(post("/api/agents/tool-connection")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void registerAgent_MissingHeader_ReturnsBadRequest() throws Exception {
+    void register_MissingHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/agents/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registrationRequest)))
@@ -232,7 +176,7 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithoutInitialKey_ReturnsBadRequest() throws Exception {
+    void register_WithoutInitialKey_ReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/agents/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registrationRequest)))
@@ -242,8 +186,8 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithInvalidInitialKey_ReturnsUnauthorized() throws Exception {
-        when(agentService.registerAgent(any(String.class), any(AgentRegistrationRequest.class)))
+    void register_WithInvalidInitialKey_ReturnsUnauthorized() throws Exception {
+        when(agentRegistrationService.register(any(String.class), any(AgentRegistrationRequest.class)))
                 .thenThrow(new BadCredentialsException("Invalid initial key"));
 
         mockMvc.perform(post("/api/agents/register")
@@ -256,8 +200,8 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithDuplicateMachineId_ReturnsConflict() throws Exception {
-        when(agentService.registerAgent(eq("test-key"), any(AgentRegistrationRequest.class)))
+    void register_WithDuplicateMachineId_ReturnsConflict() throws Exception {
+        when(agentRegistrationService.register(eq("test-key"), any(AgentRegistrationRequest.class)))
                 .thenThrow(new DuplicateConnectionException("Machine already registered"));
 
         mockMvc.perform(post("/api/agents/register")
@@ -270,8 +214,8 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithValidRequest_ReturnsCredentials() throws Exception {
-        when(agentService.registerAgent(eq("test-key"), any(AgentRegistrationRequest.class)))
+    void register_WithValidRequest_ReturnsCredentials() throws Exception {
+        when(agentRegistrationService.register(eq("test-key"), any(AgentRegistrationRequest.class)))
                 .thenReturn(registrationResponse);
 
         mockMvc.perform(post("/api/agents/register")
@@ -284,8 +228,8 @@ class AgentControllerTest {
     }
 
     @Test
-    void registerAgent_WithValidRequest_StoresAgentInfo() throws Exception {
-        when(agentService.registerAgent(eq("test-key"), any(AgentRegistrationRequest.class)))
+    void register_WithValidRequest_StoresAgentInfo() throws Exception {
+        when(agentRegistrationService.register(eq("test-key"), any(AgentRegistrationRequest.class)))
                 .thenReturn(registrationResponse);
 
         mockMvc.perform(post("/api/agents/register")
@@ -294,7 +238,7 @@ class AgentControllerTest {
                         .content(objectMapper.writeValueAsString(registrationRequest)))
                 .andExpect(status().isOk());
 
-        verify(agentService).registerAgent(
+        verify(agentRegistrationService).register(
                 eq("test-key"),
                 argThat(request ->
                                 request.getHostname().equals("test-host") &&
@@ -336,38 +280,6 @@ class AgentControllerTest {
 
     @Test
     @WithMockUser(roles = "USER")
-    void updateToolConnection_WhenNotFound_Returns404() throws Exception {
-        when(toolConnectionService.updateToolConnection(
-                eq(OPENFRAME_AGENT_ID),
-                eq(TOOL_TYPE),
-                eq(AGENT_TOOL_ID)))
-                .thenThrow(new ConnectionNotFoundException("Connection not found"));
-
-        mockMvc.perform(put("/api/agents/tool-connections/{openframeAgentId}/{toolType}",
-                        OPENFRAME_AGENT_ID, TOOL_TYPE)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(toolConnectionUpdateRequest)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("not_found"))
-                .andExpect(jsonPath("$.message").value("Connection not found"));
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void deleteToolConnection_WhenNotFound_Returns404() throws Exception {
-        doThrow(new ConnectionNotFoundException("Connection not found"))
-                .when(toolConnectionService)
-                .deleteToolConnection(OPENFRAME_AGENT_ID, TOOL_TYPE);
-
-        mockMvc.perform(delete("/api/agents/tool-connections/{openframeAgentId}/{toolType}",
-                        OPENFRAME_AGENT_ID, TOOL_TYPE))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("not_found"))
-                .andExpect(jsonPath("$.message").value("Connection not found"));
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
     void getToolConnectionByMachineIdAndToolType_WithInvalidAgentId_ReturnsBadRequest() throws Exception {
         when(toolConnectionService.getToolConnectionByMachineIdAndToolType(eq("invalid-id"), any()))
                 .thenThrow(new InvalidAgentIdException("Invalid agent ID"));
@@ -401,23 +313,6 @@ class AgentControllerTest {
         mockMvc.perform(get("/api/agents/tool-connections/{openframeAgentId}/{toolType}",
                         OPENFRAME_AGENT_ID, TOOL_TYPE))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void addToolConnection_WhenAlreadyExists_ReturnsConflict() throws Exception {
-        when(toolConnectionService.addToolConnection(
-                eq(OPENFRAME_AGENT_ID),
-                eq(TOOL_TYPE),
-                eq(AGENT_TOOL_ID)))
-                .thenThrow(new DuplicateConnectionException("Tool connection already exists for this machine and tool type"));
-
-        mockMvc.perform(post("/api/agents/tool-connection")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(toolConnectionRequest)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("conflict"))
-                .andExpect(jsonPath("$.message").value("Tool connection already exists for this machine and tool type"));
     }
 
     @Test

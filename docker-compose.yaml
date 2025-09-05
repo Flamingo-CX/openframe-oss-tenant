@@ -1,0 +1,15 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats-ws
+    ports:
+      - "4222:4222"      # основное подключение NATS
+      - "8222:8222"      # мониторинг
+      - "8105:8080"      # WebSocket (через TLS)
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf
+      - nats-jetstream-data:/data/jetstream  # JetStream persistent storage
+    command: ["-c", "/etc/nats/nats.conf"]
+
+volumes:
+  nats-jetstream-data:

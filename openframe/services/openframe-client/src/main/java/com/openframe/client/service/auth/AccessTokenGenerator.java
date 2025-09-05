@@ -37,8 +37,8 @@ public class AccessTokenGenerator {
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(expirationSeconds))
                 .subject(client.getClientId())
+                .claim("machine_id", client.getMachineId())
                 .claim("grant_type", grantType)
-                .claim("scopes", client.getScopes())
                 .claim("roles", client.getRoles())
                 .build();
     }

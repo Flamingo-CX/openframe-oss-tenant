@@ -6,3 +6,36 @@ spring:
     activate:
       on-profile: k8s
     import: "optional:configserver:http://openframe-config.microservices.svc.cluster.local:8888"
+  cloud:
+    function:
+      definition: machineConnectedConsumer;machineDisconnectionConsumer;toolConnectionConsumer
+    stream:
+      enabled: true
+      bindings:
+        machineConnectedConsumer-in-0:
+          destination: $SYS.ACCOUNT.DEVICES.CONNECT
+          group: client-service-machine-connected
+          content-type: application/json
+        machineDisconnectionConsumer-in-0:
+          destination: $SYS.ACCOUNT.DEVICES.DISCONNECT
+          group: client-service-machine-disconnected
+          content-type: application/json
+        toolConnectionConsumer-in-0:
+          destination: machine.*.toolconnection
+          group: client-service-machine-tool-connection
+          content-type: application/json
+      binders:
+        nats:
+          type: nats
+      default-binder: nats
+
+nats:
+  spring:
+    server: nats://localhost:4222
+    username: service
+    password: service_pass
+    connection-timeout: 30s
+    max-reconnect: -1
+    reconnect-wait: 5s
+    ping-interval: 30s
+    no-echo: true

@@ -125,6 +125,11 @@ apps:
     project: datasources
     namespace: datasources
     syncWave: "1"
+  nats:
+    enabled: true
+    project: datasources
+    namespace: datasources
+    syncWave: "1"
   mongodb-exporter:
     enabled: true
     project: datasources

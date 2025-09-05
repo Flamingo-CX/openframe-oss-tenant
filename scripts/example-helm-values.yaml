@@ -191,6 +191,12 @@ apps:
     project: datasources  # Use datasources ArgoCD project
     namespace: datasources  # Deploy to datasources namespace
     syncWave: "1"     # Deploy in sync wave 1
+  
+  nats:
+    enabled: true     # Message streaming platform
+    project: datasources  # Use datasources ArgoCD project
+    namespace: datasources  # Deploy to datasources namespace
+    syncWave: "1"     # Deploy in sync wave 1
     
   mongodb-exporter:
     enabled: true     # MongoDB metrics exporter for Prometheus

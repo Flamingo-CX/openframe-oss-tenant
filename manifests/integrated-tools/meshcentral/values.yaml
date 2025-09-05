@@ -2,7 +2,11 @@ global:
   registerJob:
     enabled: true
 
+registry:
+  docker:
+    password: ""
+
 server:
   image: 
-    repo: ghcr.io/flamingo-stack/openframe-oss-tenant/meshcentral
+    repo: meshcentral-local
     tag: latest

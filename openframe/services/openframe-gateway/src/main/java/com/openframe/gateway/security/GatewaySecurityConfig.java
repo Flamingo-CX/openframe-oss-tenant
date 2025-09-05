@@ -27,6 +27,7 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 
+import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_ENDPOINT_PATH;
 import static com.openframe.gateway.security.SecurityConstants.*;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -64,9 +65,6 @@ public class GatewaySecurityConfig {
         return jwtAuthenticationConverter;
     }
 
-    /* TODO:
-      - Consider extracting permitted paths configuration to a separate component for reusability
-     */
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(
             ServerHttpSecurity http,
@@ -95,17 +93,24 @@ public class GatewaySecurityConfig {
                                 CLIENTS_PREFIX + "/api/agents/register",
                                 CLIENTS_PREFIX + "/oauth/token",
                                 DASHBOARD_PREFIX + "/sso/providers",
-                                managementContextPath + "/**"
+                                managementContextPath + "/**",
+                                // TODO: remove after migration artifacts to GitHub
+                                CLIENTS_PREFIX + "/tool-agent/**"
                         ).permitAll()
-                        .pathMatchers(DASHBOARD_PREFIX + "/**").hasRole(ADMIN)
+                        // Api service
+                            .pathMatchers(DASHBOARD_PREFIX + "/**").hasRole(ADMIN)
                         // Agent tools
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
                         .pathMatchers(WS_TOOLS_PREFIX + "/agent/**").hasRole(AGENT)
+                        // Agent nats
+                        .pathMatchers(NATS_WS_ENDPOINT_PATH).hasRole("AGENT")
+                        // Client service
                         .pathMatchers(CLIENTS_PREFIX + "/**").hasRole(AGENT)
                         // Api tools
                         .pathMatchers(TOOLS_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(WS_TOOLS_PREFIX + "/**").hasRole(ADMIN)
-                                .pathMatchers("/**").permitAll()
+                        // UI
+                        .pathMatchers("/**").permitAll()
                 )
                 .build();
     }

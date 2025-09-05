@@ -12,4 +12,4 @@ registry:
     
 image:
   repo: ghcr.io/flamingo-stack/openframe-oss-tenant/openframe-management
-  tag: latest
+  tag: 67eafcccab8256bea6c0bddf90de13ed1164723f

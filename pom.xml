@@ -30,6 +30,7 @@
         <lombok.version>1.18.30</lombok.version>
         <netflix.dgs.version>7.0.0</netflix.dgs.version>
         <kafka.version>3.6.0</kafka.version>
+        <nats.version>0.6.2+3.5</nats.version>
         <pinot.version>1.2.0</pinot.version>
         <micrometer.version>1.14.1</micrometer.version>
         <simpleclient.version>0.16.0</simpleclient.version>
@@ -44,7 +45,7 @@
         <jsonwebtoken.version>0.11.5</jsonwebtoken.version>
         <grpc.version>1.58.0</grpc.version>
         <!-- Centralized OpenFrame OSS libs version -->
-        <openframe.libs.version>1.0.6</openframe.libs.version>
+        <openframe.libs.version>999-SNAPSHOT-1</openframe.libs.version>
     </properties>
 
     <modules>
@@ -53,6 +54,7 @@
         <module>openframe/libs/openframe-data</module>
         <module>openframe/libs/openframe-jwt</module>
         <module>openframe/libs/sdk/fleetmdm</module>
+        <module>openframe/libs/sdk/tacticalrmm</module>
         <module>openframe/libs/api-library</module>
 
         <!-- Services -->
@@ -182,6 +184,11 @@
             <dependency>
                 <groupId>com.openframe</groupId>
                 <artifactId>fleetmdm</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe</groupId>
+                <artifactId>tacticalrmm</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

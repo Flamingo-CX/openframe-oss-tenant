@@ -1,0 +1,72 @@
+{{- if .Values.registerJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nats
+  annotations:
+    "argocd.argoproj.io/hook": PostSync
+    # "argocd.argoproj.io/hook-delete-policy": HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: register
+        image: curlimages/curl:8.5.0
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Registering NATS..."
+            echo "Waiting for OpenFrame Management API to become reachable..."
+            until curl --head --fail --silent http://openframe-management.microservices.svc.cluster.local:8096/management/v1/health; do
+              echo "Still waiting..."
+              sleep 10
+            done
+            curl --verbose --show-error --fail \
+              -X POST "http://openframe-management.microservices.svc.cluster.local:8095/v1/tools/nats" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "tool": {
+                  "id": "nats",
+                  "toolType": "NATS",
+                  "name": "Nats",
+                  "description": "Nats",
+                  "toolUrls": [
+                    {
+                      "url": "nats://nats-0.nats.datasources.svc.cluster.local",
+                      "port": "4222",
+                      "type": "NATS"
+                    },
+                    {
+                      "url": "ws://nats-0.nats.datasources.svc.cluster.local",
+                      "port": "8080",
+                      "type": "WS"
+                    },
+                    {
+                      "url": "http://nats-0.nats.datasources.svc.cluster.local",
+                      "port": "8222",
+                      "type": "DASHBOARD"
+                    }
+                  ],
+                  "category": "Service Discovery",
+                  "platformCategory": "OpenFrame Service",
+                  "enabled": true,
+                  "credentials": {},
+                  "layer": "Streaming",
+                  "layerOrder": 2,
+                  "layerColor": "#1E88E5",
+                  "metricsPath": "/metrics",
+                  "healthCheckEndpoint": "/health",
+                  "healthCheckInterval": 30,
+                  "connectionTimeout": 5000,
+                  "readTimeout": 5000,
+                  "allowedEndpoints": ["/api/v1/*","/metrics"],
+                  "debeziumConnector": null
+                }
+              }' \
+              --retry-delay 2 \
+              --retry-all-errors
+            echo "Nats Registration complete."
+{{- end }}

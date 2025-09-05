@@ -140,66 +140,13 @@ impl Service {
 
         // Perform health check before starting
         if let Err(e) = dir_manager.perform_health_check() {
-            error!("Directory health check failed: {}", e);
+            error!("Directory health check failed: {:#}", e);
             return Err(e.into());
         }
 
         // Initialize the client
         let client = Client::new()?;
 
-        // Start heartbeat logging in background
-        tokio::spawn(async move {
-            let mut interval = interval(Duration::from_secs(5)); // Log heartbeat every 5 seconds
-            loop {
-                interval.tick().await;
-                let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                let is_admin = PermissionUtils::is_admin();
-                info!("Running with admin/root privileges: {}", is_admin);
-
-                if !is_admin {
-                    warn!("Not running as admin/root. Attempting to execute a command with elevation.");
-                    match PermissionUtils::run_as_admin(
-                        "echo",
-                        &["Hello from elevated privileges!"],
-                    ) {
-                        Ok(_) => info!("Successfully executed elevated command"),
-                        Err(e) => warn!("Failed to execute elevated command: {}", e),
-                    }
-                } else {
-                    info!("Already running as admin/root. Executing a system command.");
-                    #[cfg(target_os = "macos")]
-                    {
-                        match PermissionUtils::run_as_admin(
-                            "system_profiler",
-                            &["SPSoftwareDataType", "-detailLevel", "mini"],
-                        ) {
-                            Ok(_) => info!("Successfully executed system command"),
-                            Err(e) => warn!("Failed to execute system command: {}", e),
-                        }
-                    }
-
-                    #[cfg(target_os = "linux")]
-                    {
-                        match PermissionUtils::run_as_admin("lsb_release", &["-a"]) {
-                            Ok(_) => info!("Successfully executed system command"),
-                            Err(e) => warn!("Failed to execute system command: {}", e),
-                        }
-                    }
-
-                    #[cfg(target_os = "windows")]
-                    {
-                        match PermissionUtils::run_as_admin("systeminfo", &["/fo", "list", "/nh"]) {
-                            Ok(_) => info!("Successfully executed system command"),
-                            Err(e) => warn!("Failed to execute system command: {}", e),
-                        }
-                    }
-                }
-                info!(
-                    "Hey Flamingos 🦩, I'm your new Rust OpenFrame Service [heartbeat: {}]",
-                    timestamp
-                );
-            }
-        });
 
         // Start the client
         client.start().await

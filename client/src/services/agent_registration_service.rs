@@ -5,7 +5,7 @@ use tracing::{info, error, debug, warn};
 use crate::clients::RegistrationClient;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse, AgentConfiguration};
-use crate::services::DeviceDataFetcher;
+use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::platform::directories::DirectoryManager;
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ impl AgentRegistrationService {
 
     // TODO: temporary save to file during installation
     // For development purposes should be manually set based on server key
-    const INITIAL_KEY: &str = "2FRoelQcEUJMsqM-bcsmOcDIjoDP-pAN";
+    const INITIAL_KEY: &str = "CjHQgUkpX7Mnm1a-FyQvNjYC2ngCKrnf";
 
     pub fn new(
         registration_client: RegistrationClient,

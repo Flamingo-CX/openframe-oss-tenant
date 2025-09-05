@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static org.springframework.security.oauth2.core.OAuth2TokenIntrospectionClaimNames.TOKEN_TYPE;
 
 @Component
@@ -29,7 +30,7 @@ public class ClientCredentialsHandler {
 
         validateClientSecret(client, clientSecret);
 
-        String accessToken = accessTokenGenerator.generate(client, "client_credentials");
+        String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
         String refreshToken = refreshTokenGenerator.generate(client.getClientId());
         long accessTokenExpirationSeconds = accessTokenGenerator.getExpirationSeconds();
 

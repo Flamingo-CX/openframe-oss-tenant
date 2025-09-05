@@ -1,5 +1,5 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, OsRng, generic_array::GenericArray, rand_core::RngCore},
     Aes256Gcm,
 };
 use anyhow::Result;
@@ -20,10 +20,18 @@ impl EncryptionService {
     pub fn encrypt(&self, data: &str) -> Result<String> {
         let key = Aes256Gcm::new_from_slice(Self::KEY.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to create encryption key: {}", e))?;
-        let nonce = aes_gcm::Nonce::from_slice(b"unique nonce");
+
+        let mut nonce_bytes = [0u8; 12];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let nonce = GenericArray::from_slice(&nonce_bytes);
+
         let ciphertext = key.encrypt(nonce, data.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to encrypt data: {}", e))?;
-        let base64_encoded = general_purpose::STANDARD.encode(ciphertext);
+
+        let mut combined = nonce_bytes.to_vec();
+        combined.extend_from_slice(&ciphertext);
+
+        let base64_encoded = general_purpose::STANDARD.encode(combined);
         Ok(base64_encoded)
     }
 } 

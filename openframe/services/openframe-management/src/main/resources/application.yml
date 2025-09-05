@@ -6,3 +6,13 @@ spring:
     activate:
       on-profile: k8s
     import: "optional:configserver:http://openframe-config.microservices.svc.cluster.local:8888"
+nats:
+  spring:
+    server: nats://localhost:4222
+    username: service
+    password: service_pass
+    connection-timeout: 30s
+    max-reconnect: 10
+    reconnect-wait: 5s
+    ping-interval: 30s
+    no-echo: true

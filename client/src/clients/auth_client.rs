@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use reqwest::{Client, header::{HeaderMap, HeaderValue}};
-use tracing::{info, error, debug};
 use std::collections::HashMap;
 
 use crate::models::AgentTokenResponse;
@@ -46,7 +45,7 @@ impl AuthClient {
         let status = response.status();
         
         if !status.is_success() {
-            return Err(anyhow::anyhow!("Failed to obtain access token: HTTP {}", status));
+            return Err(anyhow::anyhow!("Failed to obtain access token: with status {} and body {}", status, response.text().await?));
         }
 
         let token_response: AgentTokenResponse = response

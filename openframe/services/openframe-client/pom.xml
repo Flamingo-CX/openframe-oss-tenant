@@ -31,6 +31,15 @@
             <groupId>com.openframe</groupId>
             <artifactId>openframe-jwt</artifactId>
         </dependency>
+        <!-- OpenFrame SDKs -->
+        <dependency>
+            <groupId>com.openframe</groupId>
+            <artifactId>tacticalrmm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe</groupId>
+            <artifactId>fleetmdm</artifactId>
+        </dependency>
         <!-- Spring Boot starters with Jackson excluded -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

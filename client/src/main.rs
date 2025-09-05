@@ -64,7 +64,7 @@ fn main() -> Result<()> {
                         process::exit(0);
                     }
                     Err(e) => {
-                        error!("Failed to install OpenFrame client service: {}", e);
+                        error!("Failed to install OpenFrame client service: {:#}", e);
                         process::exit(1);
                     }
                 }
@@ -87,7 +87,7 @@ fn main() -> Result<()> {
                         process::exit(0);
                     }
                     Err(e) => {
-                        error!("Failed to uninstall OpenFrame client service: {}", e);
+                        error!("Failed to uninstall OpenFrame client service: {:#}", e);
                         process::exit(1);
                     }
                 }
@@ -105,12 +105,12 @@ fn main() -> Result<()> {
                 Ok(client) => {
                     info!("Starting OpenFrame client in direct mode");
                     if let Err(e) = rt.block_on(client.start()) {
-                        error!("Client failed: {}", e);
+                        error!("Client failed: {:#}", e);
                         process::exit(1);
                     }
                 }
                 Err(e) => {
-                    error!("Failed to initialize client: {}", e);
+                    error!("Failed to initialize client: {:#}", e);
                     process::exit(1);
                 }
             }
@@ -123,7 +123,7 @@ fn main() -> Result<()> {
 
             // This command is used when started by the service manager
             if let Err(e) = rt.block_on(Service::run_as_service()) {
-                error!("Service failed: {}", e);
+                error!("Service failed: {:#}", e);
                 process::exit(1);
             }
         }
@@ -158,7 +158,7 @@ fn main() -> Result<()> {
             info!("No command specified, running as service (legacy mode)");
             // Run as service by default for backward compatibility
             if let Err(e) = rt.block_on(Service::run_as_service()) {
-                error!("Service failed: {}", e);
+                error!("Service failed: {:#}", e);
                 process::exit(1);
             }
         }

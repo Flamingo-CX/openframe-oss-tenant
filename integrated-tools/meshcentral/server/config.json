@@ -52,7 +52,8 @@
       "allowedOrigin": [
         "${MESH_NGINX_HOST}",
         "${MESH_NGINX_NAT_HOST}",
-        "${MESH_EXTERNAL_HOST}"
+        "${MESH_EXTERNAL_HOST}",
+        "localhost"
       ]
     }
   }

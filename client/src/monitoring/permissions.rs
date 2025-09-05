@@ -60,7 +60,7 @@ impl PermissionMonitor {
                 info!("Permission check completed successfully");
             }
             Err(e) => {
-                error!("Permission check failed: {}", e);
+                error!("Permission check failed: {:#}", e);
 
                 // Increment error counter
                 if let Ok(mut metrics) = self.metrics.try_write() {

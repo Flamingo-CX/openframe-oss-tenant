@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+spec:
+  serviceName: "nats"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      imagePullSecrets:
+        - name: docker-pat-secret
+
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          command: ["nats-server", "-c", "/etc/nats/nats.conf"]
+          ports:
+            - containerPort: 4222
+              name: client
+            - containerPort: 8222
+              name: monitoring
+            - containerPort: 8080
+              name: websocket
+
+          volumeMounts:
+            - name: nats-config
+              mountPath: /etc/nats/nats.conf
+              subPath: nats.conf
+            - name: nats-jetstream-data
+              mountPath: /data/jetstream
+      volumes:
+        - name: nats-config
+          secret:
+            secretName: nats.conf
+
+  volumeClaimTemplates:
+    - metadata:
+        name: nats-jetstream-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 4Gi

@@ -6,7 +6,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.kafka.annotation.EnableKafka;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+        org.springframework.cloud.stream.config.BindingServiceConfiguration.class,
+        org.springframework.cloud.stream.function.FunctionConfiguration.class,
+})
 @EnableKafka
 @ComponentScan(basePackages = {
     "com.openframe.api",

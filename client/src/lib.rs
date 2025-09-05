@@ -16,6 +16,7 @@ pub mod models;
 pub mod platform;
 pub mod clients;
 pub mod services;
+pub mod listener;
 
 pub mod logging;
 pub mod monitoring;
@@ -32,12 +33,22 @@ pub mod updater;
 
 use crate::platform::DirectoryManager;
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::{AgentAuthService, AgentRegistrationService, InitialAuthenticationProcessor};
+use crate::services::{AgentAuthService, AgentRegistrationService, ToolCommandParamsResolver, ToolRunManager};
+use crate::services::InstalledToolsService;
 use crate::services::registration_processor::RegistrationProcessor;
-use crate::clients::{RegistrationClient, AuthClient};
-use crate::services::DeviceDataFetcher;
+use crate::clients::{RegistrationClient, AuthClient, ToolApiClient};
+use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::encryption_service::EncryptionService;
+use crate::clients::tool_agent_file_client::ToolAgentFileClient;
+// ToolInstaller import removed - not currently used
+use crate::services::tool_installation_service::ToolInstallationService;
+use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
+use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
+use crate::services::tool_connection_message_publisher::ToolConnectionMessagePublisher;
+use crate::services::nats_connection_manager::NatsConnectionManager;
+use crate::services::nats_message_publisher::NatsMessagePublisher;
+// ToolInstallationCommandRunner import removed - not currently used
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -103,11 +114,14 @@ pub struct Client {
     directory_manager: DirectoryManager,
     registration_processor: RegistrationProcessor,
     auth_processor: InitialAuthenticationProcessor,
+    nats_connection_manager: NatsConnectionManager,
+    tool_installation_message_listener: ToolInstallationMessageListener,
+    tool_run_manager: ToolRunManager,
 }
 
 impl Client {
-    // TODO: get from args during installation and save to file during installation
-    const GATEWAY_URL: &'static str = "https://openframe-gateway.192.168.100.100.nip.io";
+    const GATEWAY_HTTP_URL: &'static str = "http://localhost:8100";
+    const GATEWAY_WS_URL: &'static str = "ws://localhost:8100";
 
     pub fn new() -> Result<Self> {
         let config = Arc::new(RwLock::new(ClientConfiguration::default()));
@@ -130,12 +144,14 @@ impl Client {
         // Initialize HTTP client
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            // disable TLS verification for dev mode only
+            .danger_accept_invalid_certs(std::env::var("OPENFRAME_DEV_MODE").is_ok())
             .build()
             .context("Failed to create HTTP client")?;
 
         // Initialize registration client
         let registration_client = RegistrationClient::new(
-            Self::GATEWAY_URL.to_string(),
+            Self::GATEWAY_HTTP_URL.to_string(),
             http_client.clone()
         ).context("Failed to create registration client")?;
         
@@ -157,8 +173,8 @@ impl Client {
 
         // Initialize authentication client
         let auth_client = AuthClient::new(
-            Self::GATEWAY_URL.to_string(),
-            http_client
+            Self::GATEWAY_HTTP_URL.to_string(),
+            http_client.clone()
         );
         
         // Initialize encryption service
@@ -167,27 +183,72 @@ impl Client {
         // Initialize shared token service
         let shared_token_service = SharedTokenService::new(
             directory_manager.clone(),
-            encryption_service
+            encryption_service.clone()
         );
         
         // Initialize authentication service
         let auth_service = AgentAuthService::new(
             auth_client,
             config_service.clone(),
-            shared_token_service
+            shared_token_service.clone()
         );
         
         // Initialize authentication processor
         let auth_processor = InitialAuthenticationProcessor::new(
-            auth_service,
-            config_service
+            auth_service.clone(),
+            config_service.clone()
         );
+
+        // Initialize NATS connection manager
+        let nats_connection_manager = NatsConnectionManager::new(Self::GATEWAY_WS_URL, config_service.clone());
+        
+        // Initialize tool agent file client
+        let tool_agent_file_client = ToolAgentFileClient::new(
+            http_client.clone(),
+            Self::GATEWAY_HTTP_URL.to_string()
+        );
+
+        // Initialize tool API client
+        let tool_api_client = ToolApiClient::new(
+            http_client.clone(),
+            Self::GATEWAY_HTTP_URL.to_string(),
+            config_service.clone()
+        );
+
+        // Initialize installed tools service
+        let installed_tools_service = InstalledToolsService::new(directory_manager.clone())
+            .context("Failed to initialize installed tools service")?;
+
+        // Initialize NATS message publisher
+        let nats_message_publisher = NatsMessagePublisher::new(nats_connection_manager.clone());
+
+        // Initialize tool connection message publisher
+        let tool_connection_message_publisher = ToolConnectionMessagePublisher::new(nats_message_publisher.clone());
+
+        // Initialize tool run manager
+        let tool_command_params_resolver = ToolCommandParamsResolver::new(directory_manager.clone());
+        let tool_run_manager = ToolRunManager::new(installed_tools_service.clone(), tool_command_params_resolver);
+
+        // Initialize tool installation service
+        let tool_installation_service = ToolInstallationService::new(
+            tool_agent_file_client,
+            tool_api_client,
+            installed_tools_service.clone(),
+            directory_manager.clone(),
+            tool_run_manager.clone(),
+        );
+
+        // Initialize tool installation message listener
+        let tool_installation_message_listener = ToolInstallationMessageListener::new(nats_connection_manager.clone(), tool_installation_service, config_service.clone());
 
         Ok(Self {
             config,
             directory_manager,
             registration_processor,
             auth_processor,
+            nats_connection_manager,
+            tool_installation_message_listener,
+            tool_run_manager,
         })
     }
 
@@ -199,6 +260,15 @@ impl Client {
         // Processors retry it till success
         self.registration_processor.process().await?;
         self.auth_processor.process().await?;
+
+        // Connect to NATS
+        self.nats_connection_manager.connect().await?;
+
+        // Start tool installation message listener in background
+        self.tool_installation_message_listener.start().await?;
+
+        // Start tool run manager
+        self.tool_run_manager.run().await?;
 
         // Initialize logging
         let config_guard = self.config.read().await;

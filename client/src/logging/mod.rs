@@ -1,11 +1,11 @@
 /// Cross-platform logging system
 ///
 /// This module implements a robust, cross-platform logging system using the tracing
-/// library with JSON formatting. Key features:
+/// library. Key features:
 ///
 /// - Platform-specific log paths (Windows, macOS, Linux)
 /// - Automatic log rotation and compression
-/// - Consistent JSON format across platforms
+/// - Configurable output format (text one-liners by default, optional JSON)
 /// - Metrics collection via the metrics submodule
 /// - Fallback manual logging when tracing fails
 ///
@@ -38,6 +38,9 @@ use tracing_subscriber::{
     EnvFilter, Layer, Registry,
 };
 
+// Add non-blocking file writer guard to keep file logging alive
+use tracing_appender::non_blocking::{self, WorkerGuard};
+
 #[derive(Debug, Serialize)]
 struct LogEntry {
     timestamp: String,
@@ -58,6 +61,9 @@ struct LogEntry {
 static LOG_FILE: std::sync::OnceLock<Arc<Mutex<Option<std::fs::File>>>> =
     std::sync::OnceLock::new();
 
+// Keep non-blocking worker guard alive for file logging
+static LOG_GUARD: std::sync::OnceLock<WorkerGuard> = std::sync::OnceLock::new();
+
 // Get access to the global log file for manual writing
 fn get_log_file() -> Arc<Mutex<Option<std::fs::File>>> {
     LOG_FILE.get().cloned().unwrap_or_else(|| {
@@ -70,30 +76,18 @@ fn get_log_file() -> Arc<Mutex<Option<std::fs::File>>> {
 // Manual log function that writes directly to file - fallback when tracing fails
 pub fn manual_log(level: &str, message: &str) {
     let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
-    let entry = LogEntry {
-        timestamp,
-        level: level.to_string(),
-        target: "manual".to_string(),
-        module_path: None,
-        file: None,
-        line: None,
-        thread: format!("{:?}", std::thread::current().id()),
-        message: message.to_string(),
-        error: None,
-        context: serde_json::Value::Object(serde_json::Map::new()),
-    };
+    // Write a simple single-line text log
+    let line = format!("{} {} [{}] {}", timestamp, level, "manual", message);
 
-    if let Ok(json) = serde_json::to_string(&entry) {
-        if let Ok(mut file_lock) = get_log_file().lock() {
-            if let Some(ref mut file) = *file_lock {
-                let _ = writeln!(file, "{}", json);
-                let _ = file.flush();
-            }
+    if let Ok(mut file_lock) = get_log_file().lock() {
+        if let Some(ref mut file) = *file_lock {
+            let _ = writeln!(file, "{}", line);
+            let _ = file.flush();
         }
-
-        // Also write to stdout for capture by LaunchDaemon
-        println!("{}", json);
     }
+
+    // Also write to stdout for capture by LaunchDaemon
+    println!("{}", line);
 }
 
 pub struct JsonLayer {
@@ -256,22 +250,12 @@ pub fn init(log_endpoint: Option<String>, agent_id: Option<String>) -> std::io::
             // This runs in a background thread so we just log any errors
             loop {
                 if let Err(e) = compress_old_logs(&dir_manager_clone) {
-                    log::error!("Error compressing old logs: {}", e);
+                    log::error!("Error compressing old logs: {:#}", e);
                 }
                 // Check for files to compress every hour
                 std::thread::sleep(std::time::Duration::from_secs(3600));
             }
         });
-
-        // Create a JSON layer for structured logging
-        let json_layer = match JsonLayer::new(log_file_path) {
-            Ok(layer) => layer,
-            Err(e) => {
-                eprintln!("ERROR: Failed to create JSON logging layer: {}", e);
-                init_result = Err(e);
-                return;
-            }
-        };
 
         // Create metrics layer and store
         let (metrics_layer, metrics_store) = metrics::MetricsLayer::new();
@@ -283,19 +267,77 @@ pub fn init(log_endpoint: Option<String>, agent_id: Option<String>) -> std::io::
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-        let subscriber = Registry::default()
-            .with(env_filter)
-            .with(json_layer)
-            .with(metrics_layer);
+        // Decide output format: default to text (one-liners). Set OPENFRAME_LOG_FORMAT=json to use JSON
+        let format = std::env::var("OPENFRAME_LOG_FORMAT").unwrap_or_else(|_| "text".into());
 
-        // Set the global default subscriber
-        if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-            eprintln!("ERROR: Failed to set global tracing subscriber: {}", e);
-            init_result = Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to set global tracing subscriber: {}", e),
-            ));
-            return;
+        if format.eq_ignore_ascii_case("json") {
+            // JSON structured logging (legacy behavior)
+            // Create a JSON layer for structured logging
+            let json_layer = match JsonLayer::new(log_file_path.clone()) {
+                Ok(layer) => layer,
+                Err(e) => {
+                    eprintln!("ERROR: Failed to create JSON logging layer: {}", e);
+                    init_result = Err(e);
+                    return;
+                }
+            };
+
+            let subscriber = Registry::default()
+                .with(env_filter)
+                .with(json_layer)
+                .with(metrics_layer);
+
+            if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+                eprintln!("ERROR: Failed to set global tracing subscriber: {}", e);
+                init_result = Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to set global tracing subscriber: {}", e),
+                ));
+                return;
+            }
+        } else {
+            // Text one-liner logging to stdout and file
+            // Non-blocking file writer
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_file_path)
+                .expect("failed to open log file for text logging");
+            let (file_writer, guard) = non_blocking::NonBlockingBuilder::default()
+                .lossy(false)
+                .thread_name("of-log-writer")
+                .finish(file);
+            let _ = LOG_GUARD.set(guard); // keep guard alive
+
+            // stdout layer (compact, single-line)
+            let stdout_layer = fmt::layer()
+                .with_target(true)
+                .with_level(true)
+                .compact()
+                .with_ansi(false);
+
+            // file layer (compact, single-line)
+            let file_layer = fmt::layer()
+                .with_target(true)
+                .with_level(true)
+                .compact()
+                .with_ansi(false)
+                .with_writer(file_writer);
+
+            let subscriber = Registry::default()
+                .with(env_filter)
+                .with(stdout_layer)
+                .with(file_layer)
+                .with(metrics_layer);
+
+            if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+                eprintln!("ERROR: Failed to set global tracing subscriber: {}", e);
+                init_result = Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to set global tracing subscriber: {}", e),
+                ));
+                return;
+            }
         }
 
         // Force an initial log entry with explicit info level to ensure logging is working
@@ -330,7 +372,7 @@ fn compress_old_logs(dir_manager: &DirectoryManager) -> io::Result<()> {
     let log_dir = match dir_manager.logs_dir().canonicalize() {
         Ok(dir) => dir,
         Err(e) => {
-            log::error!("Failed to get logs directory: {}", e);
+            log::error!("Failed to get logs directory: {:#}", e);
             return Ok(());
         }
     };
@@ -339,7 +381,7 @@ fn compress_old_logs(dir_manager: &DirectoryManager) -> io::Result<()> {
     let mut entries = match fs::read_dir(log_dir) {
         Ok(entries) => entries,
         Err(e) => {
-            log::error!("Failed to read logs directory: {}", e);
+            log::error!("Failed to read logs directory: {:#}", e);
             return Ok(());
         }
     };
@@ -354,7 +396,10 @@ fn compress_old_logs(dir_manager: &DirectoryManager) -> io::Result<()> {
         let entry = match entry {
             Ok(entry) => entry,
             Err(e) => {
-                log::error!("Failed to read directory entry: {}", e);
+                log::error!(
+                    "Failed to read directory entry: {}",
+                    e
+                );
                 continue;
             }
         };
